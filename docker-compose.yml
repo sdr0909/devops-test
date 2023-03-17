@@ -1,0 +1,70 @@
+version: '3'
+services:
+  app:
+    image: php:8.2-fpm
+    container_name: devops-test
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./myapp:/var/www
+      - ./conf/php-fpm/php-fpm.conf:/etc/php-fpm/php-fpm.conf
+    ports:
+      - 9000:9000
+    networks:
+      - test-devops
+    depends_on:
+      - db
+  db:
+    image: postgres:15
+    container_name: devops-test-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PORT: 5432
+    ports:
+      - 5432:5432
+  nginx:
+    image: nginx:alpine
+    container_name: devops-test-nginx
+    restart: unless-stopped
+    ports:
+      - 80:80
+    volumes:
+      - ./myapp:/var/www
+      - ./conf/nginx/nginx.conf:/etc/nginx/conf.d/server.conf
+    networks:
+      - test-devops
+    depends_on:
+      - app
+  composer:
+    image: composer:2
+    command: composer install --no-dev
+    volumes:
+      - ./myapp:/var/www
+    working_dir: /var/www
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: devops-test-rabbitmq
+    restart: unless-stopped
+    ports:
+      - 5672:5672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    networks:
+      - test-devops
+  supervisor:
+    image: polinux/supervisor
+    container_name: devops-test-supervisor
+    restart: unless-stopped
+    networks:
+      - test-devops
+networks:
+  test-devops:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.16.238.0/24
